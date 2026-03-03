@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bind9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bind9
+  template:
+    metadata:
+      labels:
+        app: bind9
+    spec:
+      containers:
+        - name: bind9
+          image: internetsystemsconsortium/bind9:9.20
+          imagePullPolicy: IfNotPresent
+          args: ["-g", "-c", "/etc/bind/named.conf"]
+          ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 53
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - name: bind-config
+              mountPath: /etc/bind/named.conf
+              subPath: named.conf
+              readOnly: true
+            - name: bind-config
+              mountPath: /etc/bind/zones/db.lab.dns
+              subPath: db.lab.dns
+              readOnly: true
+      volumes:
+        - name: bind-config
+          configMap:
+            name: bind9-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bind9
+spec:
+  selector:
+    app: bind9
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 53
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: 53
+      protocol: TCP

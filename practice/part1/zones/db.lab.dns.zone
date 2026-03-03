@@ -1,0 +1,30 @@
+$TTL 300
+@ IN SOA ns1.lab.dns. admin.lab.dns. (
+  2026050302 ; serial
+  3600       ; refresh
+  900        ; retry
+  1209600    ; expire
+  300        ; minimum
+)
+
+@    IN NS    ns1.lab.dns.
+@    IN NS    ns2.lab.dns.
+@    IN A     10.10.10.10
+@    IN AAAA  fd00:10:10::10
+
+ns1  IN A     10.10.10.11
+ns2  IN A     10.10.10.12
+
+www  IN A     10.10.10.20
+www  IN AAAA  fd00:10:10::20
+api  IN A     10.10.10.22
+api  IN AAAA  fd00:10:10::22
+mail IN A     10.10.10.25
+mail IN AAAA  fd00:10:10::25
+
+blog IN CNAME www.lab.dns.
+
+@    IN MX 10 mail.lab.dns.
+
+@    IN TXT "v=spf1 mx -all"
+@    IN TXT "lab=part1-demo"

@@ -1,0 +1,91 @@
+version: '3'
+
+set: [errexit, pipefail]
+
+tasks:
+  info:
+    desc: Print part 1 overview and prerequisites
+    silent: true
+    cmds:
+      - |
+        echo "Part 1 - From /etc/hosts to BIND-9"
+        echo "Blog: DNS Part 1"
+        echo "Cluster: dns-part1"
+        echo "Prereqs: docker, k3d, kubectl, dig"
+        echo "Goal: run an authoritative BIND server and trace resolution with dig"
+
+  check-prereqs:
+    desc: Verify required tools for part 1
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for tool in docker k3d kubectl dig; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "MISSING: $tool"
+            missing=1
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          echo "Install missing prerequisites before running part 1."
+          exit 1
+        fi
+
+  run:
+    desc: Run part 1 lab
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./run.sh ]; then
+          echo "Missing ./run.sh in practice/part1"
+          exit 1
+        fi
+        bash ./run.sh
+
+  reload:
+    desc: Reload bind9 after zone file edits
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./reload.sh ]; then
+          echo "Missing ./reload.sh in practice/part1"
+          exit 1
+        fi
+        bash ./reload.sh
+
+  test:
+    desc: Verify part 1 lab state
+    deps: [check-prereqs]
+    cmds:
+      - |
+        fail() { echo "FAIL: $1"; exit 1; }
+        ok() { echo "OK:   $1"; }
+
+        k3d cluster list | grep -q "dns-part1" || {
+          fail "cluster dns-part1 not found (run 'task run' first)"
+        }
+
+        kubectl rollout status deployment/bind9 --timeout=120s >/dev/null || fail "bind9 deployment is not ready"
+        kubectl wait --for=condition=Ready pod/debug --timeout=120s >/dev/null || fail "debug pod is not ready"
+
+        soa=$(kubectl exec debug -- dig +short @bind9 lab.dns SOA 2>/dev/null || true)
+        echo "$soa" | grep -q "ns1.lab.dns." || fail "SOA query does not include ns1.lab.dns"
+        ok "SOA query works"
+
+        www_ip=$(kubectl exec debug -- dig +short @bind9 www.lab.dns A 2>/dev/null | { read -r line || true; echo "$line"; } || true)
+        [ "$www_ip" = "10.10.10.20" ] || fail "www.lab.dns expected 10.10.10.20, got '$www_ip'"
+        ok "A record query works"
+
+        mx=$(kubectl exec debug -- dig +short @bind9 lab.dns MX 2>/dev/null || true)
+        echo "$mx" | grep -q "mail.lab.dns." || fail "MX record for mail.lab.dns missing"
+        ok "MX record query works"
+
+  cleanup:
+    desc: Clean up part 1 lab
+    cmds:
+      - |
+        if [ ! -f ./cleanup.sh ]; then
+          echo "Missing ./cleanup.sh in practice/part1"
+          exit 1
+        fi
+        bash ./cleanup.sh

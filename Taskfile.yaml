@@ -1,0 +1,123 @@
+version: '3'
+
+set: [errexit, pipefail]
+
+includes:
+  part1:
+    taskfile: ./practice/part1/Taskfile.yaml
+    dir: ./practice/part1
+  part2:
+    taskfile: ./practice/part2/Taskfile.yaml
+    dir: ./practice/part2
+  part3:
+    taskfile: ./practice/part3/Taskfile.yaml
+    dir: ./practice/part3
+  part4:
+    taskfile: ./practice/part4/Taskfile.yaml
+    dir: ./practice/part4
+
+tasks:
+  default:
+    desc: Show DNS labs and available tasks
+    cmds:
+      - task: list
+
+  list:
+    desc: Print DNS parts and key commands
+    silent: true
+    cmds:
+      - |
+        echo "============================================="
+        echo "DNS Evolution in Practice - Companion Labs"
+        echo "============================================="
+        echo ""
+        echo "| Part | Title | Cluster |"
+        echo "|------|-------|---------|"
+        echo "| 1 | From /etc/hosts to BIND-9 | dns-part1 |"
+        echo "| 2 | Service Discovery with Consul/CoreDNS | dns-part2 |"
+        echo "| 3 | DNS as a Load Balancer | dns-part3 |"
+        echo "| 4 | When DNS Lies (DNSSEC defense) | dns-part4 |"
+        echo ""
+        echo "Key commands:"
+        echo "  task check-tools"
+        echo "  task part1:run   (replace part1 with part2/part3/part4)"
+        echo "  task part1:test"
+        echo "  task part1:cleanup"
+        echo "  task all:run"
+        echo "  task test-all"
+        echo "  task repro PART=1"
+
+  check-tools:
+    desc: Verify prerequisites across all DNS labs
+    cmds:
+      - |
+        missing=0
+        check_tool() {
+          name="$1"
+          mac_hint="$2"
+          linux_hint="$3"
+          if ! command -v "$name" >/dev/null 2>&1; then
+            echo "MISSING: $name"
+            echo "  macOS: $mac_hint"
+            echo "  Linux: $linux_hint"
+            missing=1
+          fi
+        }
+
+        echo "Checking required tools..."
+        check_tool docker "brew install --cask docker" "sudo apt-get install -y docker.io"
+        check_tool k3d "brew install k3d" "curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash"
+        check_tool kubectl "brew install kubectl" "sudo apt-get install -y kubectl"
+        check_tool dig "brew install bind" "sudo apt-get install -y dnsutils"
+        check_tool helm "brew install helm" "sudo apt-get install -y helm"
+        check_tool python3 "brew install python" "sudo apt-get install -y python3"
+
+        if ! command -v tshark >/dev/null 2>&1 && ! command -v wireshark >/dev/null 2>&1; then
+          echo "MISSING: tshark (or wireshark)"
+          echo "  macOS: brew install wireshark"
+          echo "  Linux: sudo apt-get install -y tshark"
+          missing=1
+        fi
+
+        if [ "$missing" -ne 0 ]; then
+          echo ""
+          echo "One or more prerequisites are missing."
+          exit 1
+        fi
+
+        echo "All required tools are installed."
+
+  all:run:
+    desc: Run all DNS labs in sequence
+    deps: [check-tools]
+    cmds:
+      - task: part1:run
+      - task: part2:run
+      - task: part3:run
+      - task: part4:run
+
+  test-all:
+    desc: Run all part test tasks in sequence
+    deps: [check-tools]
+    cmds:
+      - task: part1:test
+      - task: part2:test
+      - task: part3:test
+      - task: part4:test
+
+  repro:
+    desc: Reproducibility cycle for one part (PART=1..4)
+    requires:
+      vars: [PART]
+    cmds:
+      - |
+        case "{{.PART}}" in
+          1|2|3|4) ;;
+          *)
+            echo "Invalid PART={{.PART}}. Use PART=1..4"
+            exit 1
+            ;;
+        esac
+      - task "part{{.PART}}:run"
+      - task "part{{.PART}}:test"
+      - task "part{{.PART}}:cleanup"
