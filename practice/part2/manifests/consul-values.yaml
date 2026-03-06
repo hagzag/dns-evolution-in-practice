@@ -1,0 +1,15 @@
+global:
+  name: consul
+
+server:
+  replicas: 1
+  bootstrapExpect: 1
+
+ui:
+  enabled: false
+
+connectInject:
+  enabled: false
+
+dns:
+  enabled: true

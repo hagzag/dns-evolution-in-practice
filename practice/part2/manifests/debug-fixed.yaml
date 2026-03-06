@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-fixed
+  labels:
+    app: debug-fixed
+spec:
+  dnsConfig:
+    options:
+      - name: ndots
+        value: "1"
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot:latest
+      command: ["/bin/bash", "-lc", "sleep infinity"]

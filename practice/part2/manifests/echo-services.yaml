@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-clusterip
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo-clusterip
+  template:
+    metadata:
+      labels:
+        app: echo-clusterip
+    spec:
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:5678", "-text=echo-clusterip"]
+          ports:
+            - containerPort: 5678
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-clusterip
+spec:
+  selector:
+    app: echo-clusterip
+  ports:
+    - name: http
+      port: 5678
+      targetPort: 5678
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-headless
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: echo-headless
+  template:
+    metadata:
+      labels:
+        app: echo-headless
+    spec:
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:5678", "-text=echo-headless"]
+          ports:
+            - containerPort: 5678
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-headless
+spec:
+  clusterIP: None
+  selector:
+    app: echo-headless
+  ports:
+    - name: http
+      port: 5678
+      targetPort: 5678

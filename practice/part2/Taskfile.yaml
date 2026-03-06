@@ -1,0 +1,91 @@
+version: '3'
+
+set: [errexit, pipefail]
+
+tasks:
+  info:
+    desc: Print part 2 overview and prerequisites
+    silent: true
+    cmds:
+      - |
+        echo "Part 2 - Service Discovery with Consul and CoreDNS"
+        echo "Blog: DNS Part 2"
+        echo "Cluster: dns-part2"
+        echo "Prereqs: docker, k3d, kubectl, helm, dig"
+        echo "Goal: query Consul DNS and observe ndots:5 behavior"
+
+  check-prereqs:
+    desc: Verify required tools for part 2
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for tool in docker k3d kubectl helm dig; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "MISSING: $tool"
+            missing=1
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          echo "Install missing prerequisites before running part 2."
+          exit 1
+        fi
+
+  run:
+    desc: Run part 2 lab
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./run.sh ]; then
+          echo "Missing ./run.sh in practice/part2"
+          exit 1
+        fi
+        bash ./run.sh
+
+  ndots-benchmark:
+    desc: Compare ndots behavior between debug and debug-fixed
+    deps: [check-prereqs]
+    cmds:
+      - |
+        kubectl exec debug -- bash -lc 'time for i in $(seq 1 100); do dig +short google.com >/dev/null; done'
+        kubectl exec debug-fixed -- bash -lc 'time for i in $(seq 1 100); do dig +short google.com >/dev/null; done'
+
+  test:
+    desc: Verify part 2 lab state
+    deps: [check-prereqs]
+    cmds:
+      - |
+        fail() { echo "FAIL: $1"; exit 1; }
+        ok() { echo "OK:   $1"; }
+
+        k3d cluster list | grep -q "dns-part2" || {
+          fail "cluster dns-part2 not found (run 'task run' first)"
+        }
+
+        kubectl -n consul rollout status statefulset/consul-server --timeout=120s >/dev/null || fail "consul-server is not ready"
+        kubectl rollout status deployment/echo-clusterip --timeout=120s >/dev/null || fail "echo-clusterip deployment is not ready"
+        kubectl rollout status deployment/echo-headless --timeout=120s >/dev/null || fail "echo-headless deployment is not ready"
+        kubectl wait --for=condition=Ready pod/debug --timeout=120s >/dev/null || fail "debug pod is not ready"
+        kubectl wait --for=condition=Ready pod/debug-fixed --timeout=120s >/dev/null || fail "debug-fixed pod is not ready"
+
+        consul_answer=$(kubectl exec debug -- dig +short @consul-dns.consul.svc.cluster.local echo.service.consul A 2>/dev/null || true)
+        [ -n "$consul_answer" ] || fail "consul DNS query for echo.service.consul returned no answer"
+        ok "consul DNS query works"
+
+        srv_count=$(kubectl exec debug -- dig +short _http._tcp.echo-headless.default.svc.cluster.local SRV 2>/dev/null | wc -l | tr -d ' ')
+        [ "$srv_count" -ge 1 ] || fail "headless SRV query returned no records"
+        ok "headless service SRV query works"
+
+        ndots_fixed=$(kubectl exec debug-fixed -- cat /etc/resolv.conf 2>/dev/null | grep -c 'ndots:1' || true)
+        [ "$ndots_fixed" -ge 1 ] || fail "debug-fixed resolv.conf missing ndots:1"
+        ok "debug-fixed ndots override applied"
+
+  cleanup:
+    desc: Clean up part 2 lab
+    cmds:
+      - |
+        if [ ! -f ./cleanup.sh ]; then
+          echo "Missing ./cleanup.sh in practice/part2"
+          exit 1
+        fi
+        bash ./cleanup.sh
