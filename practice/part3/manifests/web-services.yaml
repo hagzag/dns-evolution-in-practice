@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-eu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-eu
+      region: eu
+  template:
+    metadata:
+      labels:
+        app: web-eu
+        region: eu
+    spec:
+      nodeSelector:
+        region: eu
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:5678", "-text=region: eu"]
+          ports:
+            - containerPort: 5678
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-eu
+spec:
+  selector:
+    app: web-eu
+  ports:
+    - name: http
+      port: 5678
+      targetPort: 5678
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-us
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-us
+      region: us
+  template:
+    metadata:
+      labels:
+        app: web-us
+        region: us
+    spec:
+      nodeSelector:
+        region: us
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:5678", "-text=region: us"]
+          ports:
+            - containerPort: 5678
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-us
+spec:
+  selector:
+    app: web-us
+  ports:
+    - name: http
+      port: 5678
+      targetPort: 5678

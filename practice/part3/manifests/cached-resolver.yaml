@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cached-resolver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cached-resolver
+  template:
+    metadata:
+      labels:
+        app: cached-resolver
+    spec:
+      containers:
+        - name: dnsmasq
+          image: jpillora/dnsmasq:latest
+          args: ["-k", "--conf-file=/etc/dnsmasq/dnsmasq.conf"]
+          ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 53
+              protocol: TCP
+          volumeMounts:
+            - name: resolver-config
+              mountPath: /etc/dnsmasq/dnsmasq.conf
+              subPath: dnsmasq.conf
+      volumes:
+        - name: resolver-config
+          configMap:
+            name: cached-resolver-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cached-resolver
+spec:
+  selector:
+    app: cached-resolver
+  ports:
+    - name: dns-udp
+      port: 53
+      protocol: UDP
+      targetPort: 53
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
+      targetPort: 53

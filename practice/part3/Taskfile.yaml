@@ -1,0 +1,99 @@
+version: '3'
+
+set: [errexit, pipefail]
+
+tasks:
+  info:
+    desc: Print part 3 overview and prerequisites
+    silent: true
+    cmds:
+      - |
+        echo "Part 3 - DNS as a Load Balancer"
+        echo "Blog: DNS Part 3"
+        echo "Cluster: dns-part3"
+        echo "Prereqs: docker, k3d, kubectl, dig"
+        echo "Goal: observe weighted responses and TTL-bound failover"
+
+  check-prereqs:
+    desc: Verify required tools for part 3
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for tool in docker k3d kubectl dig; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "MISSING: $tool"
+            missing=1
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          echo "Install missing prerequisites before running part 3."
+          exit 1
+        fi
+
+  run:
+    desc: Run part 3 lab
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./run.sh ]; then
+          echo "Missing ./run.sh in practice/part3"
+          exit 1
+        fi
+        bash ./run.sh
+
+  sample:
+    desc: Sample weighted DNS responses from custom resolver
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./sample.sh ]; then
+          echo "Missing ./sample.sh in practice/part3"
+          echo "Tip: add helper script during Part 3 implementation."
+          exit 1
+        fi
+        bash ./sample.sh
+
+  failover:
+    desc: Trigger and observe failover timing
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./failover.sh ]; then
+          echo "Missing ./failover.sh in practice/part3"
+          echo "Tip: add helper script during Part 3 implementation."
+          exit 1
+        fi
+        bash ./failover.sh
+
+  test:
+    desc: Verify part 3 lab state
+    deps: [check-prereqs]
+    cmds:
+      - |
+        fail() { echo "FAIL: $1"; exit 1; }
+        ok() { echo "OK:   $1"; }
+
+        k3d cluster list | grep -q "dns-part3" || {
+          fail "cluster dns-part3 not found (run 'task run' first)"
+        }
+
+        kubectl rollout status deployment/web-eu --timeout=120s >/dev/null || fail "web-eu deployment not ready"
+        kubectl rollout status deployment/web-us --timeout=120s >/dev/null || fail "web-us deployment not ready"
+        kubectl rollout status deployment/custom-coredns --timeout=120s >/dev/null || fail "custom-coredns deployment not ready"
+        kubectl rollout status deployment/cached-resolver --timeout=120s >/dev/null || fail "cached-resolver deployment not ready"
+        kubectl wait --for=condition=Ready pod/debug --timeout=120s >/dev/null || fail "debug pod not ready"
+
+        answer=$(kubectl exec debug -- dig +short @cached-resolver web.lab.dns A 2>/dev/null | { read -r line || true; echo "$line"; } || true)
+        [ -n "$answer" ] || fail "web.lab.dns does not resolve via cached-resolver"
+        ok "web.lab.dns resolves via cached-resolver"
+
+  cleanup:
+    desc: Clean up part 3 lab
+    cmds:
+      - |
+        if [ ! -f ./cleanup.sh ]; then
+          echo "Missing ./cleanup.sh in practice/part3"
+          exit 1
+        fi
+        bash ./cleanup.sh

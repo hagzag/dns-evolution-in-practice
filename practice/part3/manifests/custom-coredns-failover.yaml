@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-coredns-config
+data:
+  Corefile: |
+    lab.dns:53 {
+        file /etc/coredns/lab.db lab.dns
+        loadbalance round_robin
+        cache 30
+        errors
+        log
+    }
+  lab.db: |
+    $ORIGIN lab.dns.
+    $TTL 60
+    @ IN SOA ns1.lab.dns. admin.lab.dns. (
+      2026050402
+      3600
+      900
+      1209600
+      60
+    )
+    @ IN NS ns1.lab.dns.
+    ns1 IN A 10.10.10.53
+
+    ; Failover: EU removed, only US remains
+    web IN A 10.10.30.10
+    web IN A 10.10.30.10
+    web IN A 10.10.30.10

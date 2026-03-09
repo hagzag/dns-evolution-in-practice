@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-coredns-config
+data:
+  Corefile: |
+    lab.dns:53 {
+        file /etc/coredns/lab.db lab.dns
+        loadbalance round_robin
+        cache 30
+        errors
+        log
+    }
+  lab.db: |
+    $ORIGIN lab.dns.
+    $TTL 60
+    @ IN SOA ns1.lab.dns. admin.lab.dns. (
+      2026050401
+      3600
+      900
+      1209600
+      60
+    )
+    @ IN NS ns1.lab.dns.
+    ns1 IN A 10.10.10.53
+
+    ; Weighted 70/30 simulation by record repetition
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.20.10
+    web IN A 10.10.30.10
+    web IN A 10.10.30.10
+    web IN A 10.10.30.10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-coredns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: custom-coredns
+  template:
+    metadata:
+      labels:
+        app: custom-coredns
+    spec:
+      containers:
+        - name: coredns
+          image: coredns/coredns:1.11.1
+          args: ["-conf", "/etc/coredns/Corefile"]
+          ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 53
+              protocol: TCP
+          volumeMounts:
+            - name: coredns-config
+              mountPath: /etc/coredns/Corefile
+              subPath: Corefile
+            - name: coredns-config
+              mountPath: /etc/coredns/lab.db
+              subPath: lab.db
+      volumes:
+        - name: coredns-config
+          configMap:
+            name: custom-coredns-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom-coredns
+spec:
+  selector:
+    app: custom-coredns
+  ports:
+    - name: dns-udp
+      port: 53
+      protocol: UDP
+      targetPort: 53
+    - name: dns-tcp
+      port: 53
+      protocol: TCP
+      targetPort: 53
