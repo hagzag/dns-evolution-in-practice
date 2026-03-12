@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victim
+  namespace: victim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: victim
+  template:
+    metadata:
+      labels:
+        app: victim
+    spec:
+      containers:
+        - name: netshoot
+          image: nicolaka/netshoot:latest
+          command: ["/bin/bash", "-lc", "sleep infinity"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victim
+  namespace: victim
+spec:
+  selector:
+    app: victim
+  ports:
+    - name: dummy
+      port: 9999
+      targetPort: 9999

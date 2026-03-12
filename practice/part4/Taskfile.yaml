@@ -1,0 +1,112 @@
+version: '3'
+
+set: [errexit, pipefail]
+
+tasks:
+  info:
+    desc: Print part 4 overview and prerequisites
+    silent: true
+    cmds:
+      - |
+        echo "Part 4 - When DNS Lies (Spoofing + DNSSEC Defense)"
+        echo "Blog: DNS Part 4"
+        echo "Cluster: dns-part4"
+        echo "Prereqs: docker, k3d, kubectl, dig, python3, tshark or wireshark"
+        echo "Goal: compare forged DNS answers versus controlled resolver path"
+
+  disclaimer:
+    desc: Print mandatory safety disclaimer for part 4
+    silent: true
+    cmds:
+      - |
+        echo "Educational use only."
+        echo "Run this lab only in a local, self-contained environment you own."
+        echo "Do not target external networks, domains, or systems."
+
+  check-prereqs:
+    desc: Verify required tools for part 4
+    silent: true
+    cmds:
+      - |
+        missing=0
+        for tool in docker k3d kubectl dig python3; do
+          if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "MISSING: $tool"
+            missing=1
+          fi
+        done
+
+        if ! command -v tshark >/dev/null 2>&1 && ! command -v wireshark >/dev/null 2>&1; then
+          echo "MISSING: tshark (or wireshark)"
+          missing=1
+        fi
+
+        if [ "$missing" -ne 0 ]; then
+          echo "Install missing prerequisites before running part 4."
+          exit 1
+        fi
+
+  run:
+    desc: Run part 4 lab
+    deps: [disclaimer, check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./run.sh ]; then
+          echo "Missing ./run.sh in practice/part4"
+          exit 1
+        fi
+        bash ./run.sh
+
+  inspect-packet:
+    desc: Run forged packet inspection helper
+    deps: [check-prereqs]
+    cmds:
+      - |
+        if [ ! -f ./attacker/scripts/inspect_forged_packet.py ]; then
+          echo "Missing ./attacker/scripts/inspect_forged_packet.py"
+          exit 1
+        fi
+        python3 ./attacker/scripts/inspect_forged_packet.py
+
+  forge-demo:
+    desc: Run safe non-transmitting forge demo
+    deps: [check-prereqs]
+    cmds:
+      - |
+        target_ip=$(kubectl -n verifying-resolver get svc verifying-resolver -o jsonpath='{.spec.clusterIP}')
+        kubectl -n attacker exec deploy/attacker-dns -c tools -- \
+          python3 /scripts/forge_response.py --target "$target_ip" --qname bank.lab.dns
+
+  test:
+    desc: Verify part 4 lab state
+    deps: [check-prereqs]
+    cmds:
+      - |
+        fail() { echo "FAIL: $1"; exit 1; }
+        ok() { echo "OK:   $1"; }
+
+        k3d cluster list | grep -q "dns-part4" || {
+          fail "cluster dns-part4 not found (run 'task run' first)"
+        }
+
+        kubectl rollout status -n legit-zone deployment/legit-zone-bind9 --timeout=120s >/dev/null || fail "legit-zone bind9 not ready"
+        kubectl rollout status -n attacker deployment/attacker-dns --timeout=120s >/dev/null || fail "attacker dns not ready"
+        kubectl rollout status -n verifying-resolver deployment/verifying-resolver --timeout=120s >/dev/null || fail "verifying resolver not ready"
+        kubectl rollout status -n victim deployment/victim --timeout=120s >/dev/null || fail "victim not ready"
+
+        legit_ip=$(kubectl -n victim exec deploy/victim -- dig +short @verifying-resolver.verifying-resolver.svc.cluster.local bank.lab.dns A 2>/dev/null | { read -r line || true; echo "$line"; } || true)
+        forged_ip=$(kubectl -n victim exec deploy/victim -- dig +short @attacker-dns.attacker.svc.cluster.local bank.lab.dns A 2>/dev/null | { read -r line || true; echo "$line"; } || true)
+
+        [ "$legit_ip" = "10.20.20.20" ] || fail "expected legit resolver answer 10.20.20.20, got '$legit_ip'"
+        [ "$forged_ip" = "10.255.255.254" ] || fail "expected attacker resolver answer 10.255.255.254, got '$forged_ip'"
+        ok "legit and forged resolver paths are distinct"
+
+  cleanup:
+    desc: Clean up part 4 lab
+    cmds:
+      - |
+        if [ ! -f ./cleanup.sh ]; then
+          echo "Missing ./cleanup.sh in practice/part4"
+          exit 1
+        fi
+        bash ./cleanup.sh

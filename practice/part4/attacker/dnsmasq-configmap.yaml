@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: attacker-dnsmasq-config
+  namespace: attacker
+data:
+  dnsmasq.conf: |
+    no-resolv
+    log-queries
+    log-facility=-
+    address=/bank.lab.dns/10.255.255.254
+    server=/lab.dns/legit-zone-dns.legit-zone.svc.cluster.local#53
+    server=8.8.8.8

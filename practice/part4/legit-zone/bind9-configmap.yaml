@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: legit-zone-bind-config
+  namespace: legit-zone
+data:
+  named.conf: |
+    options {
+      directory "/var/cache/bind";
+      recursion no;
+      allow-query { any; };
+      listen-on { any; };
+      listen-on-v6 { any; };
+    };
+
+    zone "lab.dns" IN {
+      type master;
+      file "/etc/bind/zones/db.lab.dns";
+    };
+  db.lab.dns: |
+    $TTL 60
+    @ IN SOA ns1.lab.dns. admin.lab.dns. (
+      2026050401
+      3600
+      900
+      1209600
+      60
+    )
+    @ IN NS ns1.lab.dns.
+    ns1 IN A 10.200.0.53
+    bank IN A 10.20.20.20
+    mail IN A 10.20.20.30

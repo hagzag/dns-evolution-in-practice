@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: verifying-resolver
+  namespace: verifying-resolver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: verifying-resolver
+  template:
+    metadata:
+      labels:
+        app: verifying-resolver
+    spec:
+      containers:
+        - name: dnsmasq
+          image: jpillora/dnsmasq:latest
+          args: ["-k", "--conf-file=/etc/dnsmasq/dnsmasq.conf"]
+          ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 53
+              protocol: TCP
+          volumeMounts:
+            - name: resolver-config
+              mountPath: /etc/dnsmasq/dnsmasq.conf
+              subPath: dnsmasq.conf
+      volumes:
+        - name: resolver-config
+          configMap:
+            name: verifying-resolver-dnsmasq-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: verifying-resolver
+  namespace: verifying-resolver
+spec:
+  selector:
+    app: verifying-resolver
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 53
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: 53
+      protocol: TCP
