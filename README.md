@@ -1,12 +1,14 @@
 # DNS Evolution in Practice - Companion Labs
 
 Hands-on k3d labs for the blog series **"DNS - The Internet's Quiet Backbone"** by [Haggai Philip Zagury (HagZag)](https://portfolio.hagzag.com).
-
+![](https://i.ibb.co/C3F0RVqY/DNS-intro-p0-i1.png)
 Each post in the series ships a self-contained lab under `practice/partN/`, designed to run locally with no cloud account.
+
+> ℹ️ **Read full series or intro at** [here](http://portfolio.hagzag.com/blog/reading-lists/dns-evolution-in-practice/2026-03-03-dns-series-introduction)
 
 ## Layout
 
-```text
+```texts
 practice/
 |- part1/   From /etc/hosts to BIND-9
 |- part2/   DNS at Scale: Service Discovery (Consul + CoreDNS)
@@ -50,6 +52,8 @@ task test-all
 
 ## Posts
 
+![](https://i.ibb.co/ymj6k4pS/DNS-intro-p0-i2.png)
+
 1. [Series introduction](posts/2026-05-04-dns-series-introduction.md)
 2. [Part 1 - From /etc/hosts to BIND-9](posts/2024-01-02-dns-part-1-from-hosts-file-to-bind-9.md) - lab: `practice/part1/`
 3. [Part 2 - Service Discovery with Consul and CoreDNS](posts/2026-05-03-dns-part-2-service-discovery-consul-coredns.md) - lab: `practice/part2/`
@@ -59,3 +63,7 @@ task test-all
 ## Safety Note (Part 4)
 
 Part 4 includes a mandatory educational-use-only disclaimer. The lab is intentionally constrained to local, owned infrastructure and must never be used against external systems.
+
+---
+
+See you in the next series...
