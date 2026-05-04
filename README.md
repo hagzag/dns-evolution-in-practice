@@ -8,7 +8,7 @@ Each post in the series ships a self-contained lab under `practice/partN/`, desi
 
 ## Layout
 
-```texts
+```text
 practice/
 |- part1/   From /etc/hosts to BIND-9
 |- part2/   DNS at Scale: Service Discovery (Consul + CoreDNS)
